@@ -1,3 +1,4 @@
+using PaymentGateway.Api.Middleware;
 using PaymentGateway.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,8 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<PaymentsRepository>();
 
+builder.Services.AddSingleton<IPaymentsValidationService, PaymentsValidationService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -23,6 +26,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+
+app.UseMiddleware<ExceptionMiddleware>();
 
 app.MapControllers();
 
