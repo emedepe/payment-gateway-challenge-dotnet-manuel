@@ -37,6 +37,7 @@ builder.Services.AddSingleton<IPaymentsRepository, PaymentsRepository>();
 
 builder.Services.AddSingleton<IBankHttpClientFactory, BankHttpClientFactory>();
 
+builder.Services.AddScoped<IPaymentsProcessingService, PaymentsProcessingService>();
 builder.Services.AddSingleton<IPaymentsValidationService, PaymentsValidationService>();
 
 var app = builder.Build();
