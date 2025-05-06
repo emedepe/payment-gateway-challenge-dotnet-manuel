@@ -1,19 +1,54 @@
-using PaymentGateway.Api.Services;
+using PaymentGateway.Api.Factories;
+using PaymentGateway.Api.Factories.Contracts;
+using PaymentGateway.Api.Middleware;
+
+using Polly;
+using Polly.Extensions.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
-builder.Services.AddSingleton<PaymentsRepository>();
+builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+
+    options.IncludeXmlComments(xmlPath);
+});
+
+builder.Services.AddLogging();
+
+builder.Services.AddHttpClient(HttpClients.BANK_CLIENT_NAME, (provider, client) =>
+{
+    var configuration = provider.GetRequiredService<IConfiguration>();
+    var baseUrl = configuration["Bank:BaseUrl"];
+
+    if (string.IsNullOrWhiteSpace(baseUrl))
+    {
+        throw new InvalidOperationException(ConfigurationMessages.BANK_BASEURL_REQUIRED);
+    }
+
+    if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uriResult))
+    {
+        throw new InvalidOperationException(ConfigurationMessages.BANK_BASEURL_INVALID);
+    }
+
+    client.BaseAddress = uriResult;
+})
+.AddPolicyHandler(GetRetryPolicy());
+
+builder.Services.AddSingleton<IPaymentsRepository, PaymentsRepository>();
+
+builder.Services.AddSingleton<IBankHttpClientFactory, BankHttpClientFactory>();
+
+builder.Services.AddScoped<IPaymentsProcessingService, PaymentsProcessingService>();
+builder.Services.AddSingleton<IPaymentsValidationService, PaymentsValidationService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -24,6 +59,16 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
+app.UseMiddleware<ExceptionMiddleware>();
+
 app.MapControllers();
 
 app.Run();
+
+static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+{
+    return HttpPolicyExtensions
+        .HandleTransientHttpError()
+        .OrResult(message => message.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+}
