@@ -19,6 +19,30 @@ public class ExceptionMiddleware
         {
             await _next(context);
         }        
+        catch (BankInternalException ex)
+        {
+            context.Response.StatusCode = (int)HttpStatusCode.BadGateway;
+            context.Response.ContentType = "application/json";
+
+            var errorResponse = new
+            {
+                ex.Message
+            };
+
+            await context.Response.WriteAsync(JsonSerializer.Serialize(errorResponse));
+        }
+        catch (BankServiceUnavailableException ex)
+        {
+            context.Response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+            context.Response.ContentType = "application/json";
+
+            var errorResponse = new
+            {
+                ex.Message
+            };
+
+            await context.Response.WriteAsync(JsonSerializer.Serialize(errorResponse));
+        }
         catch (PaymentRequestValidationException ex)
         {
             context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
