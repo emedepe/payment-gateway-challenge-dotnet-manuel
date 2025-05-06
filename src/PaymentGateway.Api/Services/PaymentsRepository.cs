@@ -1,17 +1,17 @@
-﻿using PaymentGateway.Api.Models.Responses;
+﻿using System.Collections.Concurrent;
 
 namespace PaymentGateway.Api.Services;
 
-public class PaymentsRepository
+public class PaymentsRepository : IPaymentsRepository
 {
-    public List<PostPaymentResponse> Payments = new();
+    public ConcurrentBag<PostPaymentResponse> Payments = new();
     
     public void Add(PostPaymentResponse payment)
     {
         Payments.Add(payment);
     }
 
-    public PostPaymentResponse Get(Guid id)
+    public PostPaymentResponse? Get(Guid id)
     {
         return Payments.FirstOrDefault(p => p.Id == id);
     }
